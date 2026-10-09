@@ -1,0 +1,40 @@
+name: Build Windows installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $package = Get-ChildItem -Path . -Filter package.json -Recurse -File | Where-Object { $_.FullName -notmatch '\\node_modules\\' } | Select-Object -First 1
+          if (-not $package) { throw "Could not find package.json." }
+          Set-Location $package.DirectoryName
+          npm install
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run dist:win
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mechanical-Frontier-Windows-Installer
+          path: '**/dist-installer/Mechanical-Frontier-Setup-*.exe'
+          if-no-files-found: error
+          retention-days: 30
