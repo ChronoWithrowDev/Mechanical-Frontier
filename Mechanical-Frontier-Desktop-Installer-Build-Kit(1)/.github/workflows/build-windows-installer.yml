@@ -1,0 +1,48 @@
+name: Build Windows installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js on build machine
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Find project folder
+        shell: pwsh
+        run: |
+          $project = Get-ChildItem -Directory | Where-Object { Test-Path (Join-Path $_.FullName "package.json") } | Select-Object -First 1
+          if (-not $project) { throw "Could not find the project folder containing package.json." }
+          "PROJECT_DIR=$($project.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install packages
+        shell: pwsh
+        run: |
+          Set-Location $env:PROJECT_DIR
+          npm install
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          Set-Location $env:PROJECT_DIR
+          npm run dist:win
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mechanical-Frontier-Windows-Installer
+          path: '**/dist-installer/Mechanical-Frontier-Setup-*.exe'
+          if-no-files-found: error
+          retention-days: 30
